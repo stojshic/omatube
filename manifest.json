@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.stojshic.omatube",
+  "name": "OmaTube",
+  "version": "0.1.0",
+  "author": "Slavko Stojshic",
+  "license": "MIT",
+  "description": "YouTube Music without a browser: search and radio through YouTube Music's API, audio through mpv.",
+  "kinds": ["bar-widget", "service"],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml",
+    "service": "Service.qml"
+  },
+  "barWidget": {
+    "displayName": "OmaTube",
+    "description": "Now playing, controls and a panel for search and the queue (mpv, no browser)",
+    "category": "Media",
+    "allowMultiple": false,
+    "defaultSection": "left",
+    "defaults": {
+      "maxLabelWidth": 160
+    },
+    "schema": [
+      { "key": "maxLabelWidth", "type": "number", "label": "Title width in the bar (px)", "defaultValue": 160 }
+    ]
+  }
+}

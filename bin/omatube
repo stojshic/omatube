@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Runs omatube from its own virtualenv, wherever it is called from.
+here="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$here" exec "$here/.venv/bin/python" -m omatube.cli "$@"
