@@ -27,7 +27,6 @@ Needs `/usr/bin/mpv` and `yt-dlp` on the system.
 
 - Sign-in (library, likes, playlists, personal radio). ytmusicapi can use
   browser cookies; the sign-in itself still needs a browser once.
-- The Omarchy panel/bar: this is a CLI only.
 - Lyrics, album/artist/playlist pages, the EQ.
 
 ## Known risk
