@@ -13,7 +13,7 @@ trap 'rm -rf -- "$IMPORTS"' EXIT
 mkdir -p "$IMPORTS/qs"
 ln -s "$SHELL_DIR/Ui" "$IMPORTS/qs/Ui"
 ln -s "$SHELL_DIR/Commons" "$IMPORTS/qs/Commons"
-out="$("$QMLLINT" -I "$IMPORTS" -I /usr/lib/qt6/qml Service.qml BarWidget.qml Panel.qml 2>&1)"
+out="$("$QMLLINT" -I "$IMPORTS" -I /usr/lib/qt6/qml Service.qml BarWidget.qml Panel.qml Options.qml 2>&1)"
 real="$(printf '%s\n' "$out" | grep -E '^(Warning|Error)' \
   | grep -v 'not found on type "QObject"' \
   | grep -v 'QProcess::ExitStatus' \
@@ -24,4 +24,4 @@ if [[ -n "$real" ]]; then
   echo "qmllint: $(printf '%s\n' "$real" | wc -l) warning(s)"
   exit 1
 fi
-echo "qmllint: clean ($(ls Service.qml BarWidget.qml Panel.qml | wc -l) files)"
+echo "qmllint: clean ($(ls Service.qml BarWidget.qml Panel.qml Options.qml | wc -l) files)"

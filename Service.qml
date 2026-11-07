@@ -1,6 +1,8 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
+import "lib/Model.js" as Model
 
 // Service.qml — one per shell. Talks to mpv's JSON IPC socket directly for
 // everything the player knows (state, controls), and runs the CLI
@@ -10,8 +12,43 @@ import Quickshell.Io
 Item {
   id: root
 
+  // Pushed by the bar widget: the shell's plugin API (settings writes go
+  // through it) and this widget's entry in shell.json.
   property var shell: null
   property var settings: ({})
+  function setting(name, fallback) {
+    var v = settings ? settings[name] : undefined
+    return v === undefined || v === null ? fallback : v
+  }
+
+  // Settings store: one write path for every setting. shell.json stays the
+  // only place they live, so Omarchy's own plugin settings UI (built from
+  // manifest.json's schema) edits the same values the Options view does.
+  function saveSetting(key, value) {
+    var change = {}
+    change[key] = value
+    root.writeSettings(change)
+  }
+  function writeSettings(changes) {
+    root.pendingSettings = Object.assign({}, root.pendingSettings, changes)
+    pendingSettingsTimer.restart()
+    var next = Object.assign({}, root.settings, changes)
+    root.settings = next
+    if (root.shell && typeof root.shell.updateEntryInline === "function") root.shell.updateEntryInline(root.pluginId, next)
+  }
+  // The bar widget hands its shell.json entry over here (after every change
+  // of it). Writes of ours it does not carry yet stay (a stale echo of an
+  // earlier write must not undo a later one); after a few seconds whatever
+  // shell.json says wins.
+  property var pendingSettings: ({})
+  function adoptSettings(incoming) {
+    var r = Model.mergePendingSettings(incoming, root.pendingSettings)
+    root.pendingSettings = r.pending
+    root.settings = r.settings
+  }
+  Timer { id: pendingSettingsTimer; interval: 5000; onTriggered: root.pendingSettings = ({}) }
+
+  readonly property string pluginId: "stojshic.omatube"
 
   readonly property string cli: Qt.resolvedUrl("bin/omatube").toString().replace(/^file:\/\//, "")
   readonly property string sockPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/omatube/mpv.sock"
@@ -158,6 +195,99 @@ Item {
   function nudgeVolume(steps) { setVolume(root.volume + steps * 5) }
   function seekBy(seconds) { send(["seek", seconds, "relative"]) }
   function stop() { send(["quit"]) }
+
+  // ------------------------------------------------------------------ global keys
+
+  // OmaTube's own shortcuts, registered at runtime and only where the key
+  // is free; a Hyprland config reload wipes them, so they come back after
+  // one. The last bare program name run through Hyprland's exec (a PATH
+  // lookup, sh -c): resolved once, with an absolute fallback so a session
+  // without OMARCHY_PATH set still gets an absolute path, never a name.
+  readonly property string omarchyShellBin: {
+    var p = Quickshell.env("OMARCHY_PATH")
+    return p ? (p + "/bin/omarchy-shell") : "/usr/share/omarchy/bin/omarchy-shell"
+  }
+  readonly property bool wantKeys: root.setting("globalKeys", true)
+  // Re-synced whenever any action's key combo changes (Options.qml writes
+  // here through saveSetting), not just on enable/disable.
+  readonly property string hotkeysJson: JSON.stringify(root.setting("hotkeys", {}))
+  property bool keysRegistered: false
+  property string lastBindsJson: ""
+  onWantKeysChanged: root.syncKeys()
+  onHotkeysJsonChanged: root.syncKeys()
+
+  // The plugin can be removed or disabled without warning (Omarchy just
+  // destroys this Item): unbind OmaTube's own keys so they are not left
+  // dangling in Hyprland's config.
+  Component.onDestruction: {
+    if (root.keysRegistered && root.lastBindsJson) {
+      var off = Model.unbindLua(root.lastBindsJson)
+      if (off) Quickshell.execDetached(["/usr/bin/hyprctl", "eval", off])
+    }
+  }
+
+  // Always clears whatever Hyprland currently has bound for us (by live
+  // modmask+key, matched via description — see Model.unbindLua) before
+  // binding the current settings back, if wanted. That single order makes
+  // enable, disable, and remapping one action's key all the same path: a
+  // remap's old key never lingers because unbind reads Hyprland's live
+  // state rather than recomputing the old combo from settings.
+  Process {
+    id: bindsProc
+    command: ["/usr/bin/hyprctl", "-j", "binds"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        root.lastBindsJson = text
+        var lua = Model.unbindLua(text)
+        if (root.wantKeys) {
+          lua += Model.bindLua(Model.freeKeys(text, root.setting("hotkeys", {})), root.omarchyShellBin)
+          root.keysRegistered = true
+        } else {
+          root.keysRegistered = false
+        }
+        if (lua) Quickshell.execDetached(["/usr/bin/hyprctl", "eval", lua])
+      }
+    }
+  }
+
+  function syncKeys() {
+    if (bindsProc.running) return
+    bindsProc.running = true
+  }
+
+  Timer {
+    id: keysTimer
+    interval: 400
+    onTriggered: root.syncKeys()
+  }
+
+  Connections {
+    target: Hyprland
+    function onRawEvent(event) {
+      if (event.name === "configreloaded") { root.keysRegistered = false; keysTimer.restart() }
+    }
+  }
+
+  Timer {
+    // After the settings arrive from the bar widget.
+    interval: 1500
+    running: true
+    onTriggered: root.syncKeys()
+  }
+
+  // ------------------------------------------------------------------ IPC
+
+  IpcHandler {
+    target: root.pluginId
+
+    function toggle(): void { if (root.shell) root.shell.toggle(root.pluginId, "{}") }
+    function open(): void { if (root.shell) root.shell.summon(root.pluginId, "{}") }
+    function close(): void { if (root.shell) root.shell.hide(root.pluginId) }
+    function playPause(): void { root.togglePlaying() }
+    function next(): void { root.next() }
+    function previous(): void { root.previous() }
+    function stop(): void { root.stop() }
+  }
 
   // ------------------------------------------------------------------ the CLI
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.stojshic.omatube",
+  "id": "stojshic.omatube",
   "name": "OmaTube",
   "version": "0.1.0",
   "author": "Slavko Stojshic",
@@ -18,10 +18,12 @@
     "allowMultiple": false,
     "defaultSection": "left",
     "defaults": {
-      "maxLabelWidth": 160
+      "maxLabelWidth": 160,
+      "globalKeys": true
     },
     "schema": [
-      { "key": "maxLabelWidth", "type": "number", "label": "Title width in the bar (px)", "defaultValue": 160 }
+      { "key": "maxLabelWidth", "type": "number", "label": "Title width in the bar (px)", "defaultValue": 160 },
+      { "key": "globalKeys", "type": "bool", "label": "Global hotkeys: Super+Ctrl+Alt+O open/close, +P play/pause, +N next, +V previous, +S stop (only keys nobody else uses)", "defaultValue": true }
     ]
   }
 }

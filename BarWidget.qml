@@ -8,13 +8,22 @@ import "lib/Icons.js" as Icons
 // skips, the wheel sets the volume (Shift+wheel seeks).
 BarWidget {
   id: root
-  moduleName: "io.github.stojshic.omatube"
+  moduleName: "stojshic.omatube"
 
-  readonly property var svc: bar && bar.shell ? bar.shell.serviceFor("io.github.stojshic.omatube") : null
+  readonly property var svc: bar && bar.shell ? bar.shell.serviceFor("stojshic.omatube") : null
 
-  onSvcChanged: injectPanel()
-  onSettingsChanged: injectPanel()
-  onBarChanged: injectPanel()
+  // The service reads its settings from this widget's shell.json entry,
+  // and saves new ones back through the shell's plugin API.
+  function pushSettings() {
+    if (!root.svc) return
+    if (typeof root.svc.adoptSettings === "function") root.svc.adoptSettings(root.settings)
+    else root.svc.settings = root.settings
+    root.svc.shell = root.bar ? root.bar.shell : null
+  }
+  onSvcChanged: { pushSettings(); injectPanel() }
+  onSettingsChanged: { pushSettings(); injectPanel() }
+  onBarChanged: { pushSettings(); injectPanel() }
+  Component.onCompleted: pushSettings()
 
   // ---- the shape Bar.findPanelWidget expects (shell summon/hide/toggle)
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false

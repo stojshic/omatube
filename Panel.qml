@@ -9,7 +9,7 @@ import "lib/Icons.js" as Icons
 // results back to the queue, then closes.
 Panel {
   id: root
-  moduleName: "io.github.stojshic.omatube"
+  moduleName: "stojshic.omatube"
   manageIpc: false
 
   property var anchorItem: null
@@ -24,8 +24,21 @@ Panel {
   property string flash: ""
   readonly property var rows: showResults ? (svc ? svc.results : []) : (svc ? svc.queue : [])
 
+  property bool optionsOpen: false
+  function toggleOptions() {
+    root.optionsOpen = !root.optionsOpen
+    // Moves focus off the (now hidden) search field so Esc and the key
+    // catcher's other shortcuts are not swallowed by a blocked catcher.
+    Qt.callLater(function () { root.optionsOpen ? keys.forceActiveFocus() : field.forceActiveFocus() })
+  }
+  function closeOptions() {
+    root.optionsOpen = false
+    Qt.callLater(function () { field.forceActiveFocus() })
+  }
+
   onOpenedChanged: {
     if (!opened) return
+    optionsOpen = false
     if (svc) { svc.connectSoon(3); svc.refreshQueue() }
     cursor = -1
     Qt.callLater(function () {
@@ -68,7 +81,8 @@ Panel {
   }
 
   function back() {
-    if (showResults) { showResults = false; cursor = -1; field.text = "" }
+    if (optionsOpen) { closeOptions() }
+    else if (showResults) { showResults = false; cursor = -1; field.text = "" }
     else root.close()
   }
 
@@ -95,7 +109,9 @@ Panel {
         else if (t === "/") field.forceActiveFocus()
       }
 
-      // The app's name, small and quiet, in the top right corner.
+      // The app's name, small and quiet, and the gear (Options) in the top
+      // right corner. Esc and the gear are the only ways into and out of
+      // Options — no key letter is spent on it.
       Row {
         id: brand
         anchors.top: parent.top
@@ -119,11 +135,41 @@ Panel {
           font.family: root.family
           font.pixelSize: Style.font.caption
         }
+        Text {
+          id: gearIcon
+          anchors.verticalCenter: parent.verticalCenter
+          text: Icons.gear
+          textFormat: Text.PlainText
+          color: root.optionsOpen ? Color.accent : root.fg
+          font.family: root.family
+          font.pixelSize: Style.font.caption
+          MouseArea {
+            anchors.fill: parent
+            anchors.margins: -Style.space(4)
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.toggleOptions()
+          }
+        }
+      }
+
+      Options {
+        anchors.top: brand.bottom
+        anchors.topMargin: Style.space(10)
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: root.optionsOpen
+        svc: root.svc
+        fg: root.fg
+        family: root.family
+        onBackRequested: root.closeOptions()
       }
 
       Column {
         anchors.fill: parent
         spacing: Style.space(10)
+        visible: !root.optionsOpen
 
         // ---- now playing
         Row {
